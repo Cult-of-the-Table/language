@@ -1,14 +1,102 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use logos::Logos;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Logos, Clone, Debug, PartialEq)]
+#[logos(skip r"[ \t\r\n\f]+")]
+pub enum Token {
+    // Keywords
+    #[token("fn", priority = 100)]
+    Function,
+    #[token("return", priority = 100)]
+    Return,
+    #[token("for", priority = 100)]
+    For,
+    #[token("loop", priority = 100)]
+    Loop,
+    #[token("while", priority = 100)]
+    While,
+    #[token("break", priority = 100)]
+    Break,
+    #[token("continue", priority = 100)]
+    Continue,
+    #[token("let", priority = 100)]
+    Let,
+    #[token("mut", priority = 100)]
+    Mut,
+    #[token("in", priority = 100)]
+    In,
+    #[token("if", priority = 100)]
+    If,
+    #[token("else", priority = 100)]
+    Else,
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+    // Operators
+    #[token("+", priority = 100)]
+    Add,
+    #[token("-", priority = 100)]
+    Sub,
+    #[token("*", priority = 100)]
+    Mul,
+    #[token("**", priority = 150)]
+    Pow,
+    #[token("/", priority = 100)]
+    Div,
+    #[token("..", priority = 250)]
+    Range,
+    #[token("..=", priority = 300)]
+    RangeInclusive,
+    #[token("==", priority = 100)]
+    Eq,
+    #[token("!=", priority = 100)]
+    Neq,
+    #[token("=", priority = 100)]
+    Assign,
+    #[token("and", priority = 100)]
+    And,
+    #[token("or", priority = 100)]
+    Or,
+    #[token(".", priority = 100)]
+    Access,
+    #[token(":", priority = 100)]
+    Method,
+
+    #[token("&", priority = 100)]
+    Borrow,
+
+    // Braces
+    #[token("(", priority = 100)]
+    OpenParen,
+    #[token(")", priority = 100)]
+    CloseParen,
+    #[token("{", priority = 100)]
+    OpenBlock,
+    #[token("}", priority = 100)]
+    CloseBlock,
+    #[token("[", priority = 100)]
+    OpenList,
+    #[token("]", priority = 100)]
+    CloseList,
+
+    // Primitives
+    #[regex(r#""(?:\\"|[^"])*""#, |lex| lex.slice().trim_matches('\"').to_owned(), priority=50)]
+    #[regex(r#"'(?:\\'|[^'])*'"#, |lex| lex.slice().trim_matches('\'').to_owned(), priority=50)]
+    String(String),
+    #[token("true", |_| true, priority=100)]
+    #[token("false", |_| false, priority=100)]
+    Bool(bool),
+    #[regex(r"(?:\d)+", |lex| lex.slice().parse::<i64>().unwrap(), priority=150)]
+    Integer(i64),
+
+    // Comments
+    #[regex(r"/\*([^*]|\*+[^*/])*\*+/", |lex| lex.slice().split_at(2).1.trim().to_owned())]
+    InlineComment(String),
+    #[regex(r"//[^\r\n]*", |lex| lex.slice().split_at(2).1.trim().to_owned(), allow_greedy=true)]
+    LineComment(String),
+
+    // Identifiers
+    #[token(";", priority = 100)]
+    Semicolon,
+    #[token(",", priority = 100)]
+    ItemSep,
+    #[regex(r#"(?:[^\t\r\n\f+\- @&#$\^|%()?,\.*!;'"\[\]\{\}0123456789:])(?:[^\t\r\n\f+\- @&#$\^|%()?,*!;'"\[\]\.\{\}:])*"#, |lex| lex.slice().to_owned())]
+    Ident(String),
 }

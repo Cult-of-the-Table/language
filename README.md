@@ -1,3 +1,29 @@
+```ax
+struct Foo {
+  some_field: usize
+}
+
+impl Foo {
+  fn some_method(&self)(a: usize, b: usize) -> usize {
+    self.some_field * a + b
+  }
+
+  fn some_property(&self) {
+    return 4;
+  }
+}
+
+let x: Foo = Foo { some_field: 3 };
+
+x.some_method <- unbound function (similar to Foo::some_method)
+
+x:some_method <- bound method (takes 2 ints)
+
+
+x:copy 
+
+```
+
 
 
 ```l
