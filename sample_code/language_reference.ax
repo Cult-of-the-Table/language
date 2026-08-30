@@ -21,4 +21,4 @@ x.some_method
 x:some_method
 
 // Can also access properties, like so:
-x:copied
+x:copy()
