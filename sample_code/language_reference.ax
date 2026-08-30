@@ -1,0 +1,24 @@
+struct Foo {
+  some_field: usize
+}
+
+impl Foo {
+  fn some_method(&self)(a: usize, b: usize) -> usize {
+    self.some_field * a + b
+  }
+
+  fn some_property(&self) {
+    return 4;
+  }
+}
+
+let x: Foo = Foo { some_field: 3 };
+
+// Unbound function access (similar to Foo::some_method in other languages)
+x.some_method
+
+// Bound function access (`self` is now partially applied, passing `x:some_method` into a function allows it to access `self`)
+x:some_method
+
+// Can also access properties, like so:
+x:copied

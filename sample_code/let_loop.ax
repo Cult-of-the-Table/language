@@ -1,0 +1,11 @@
+let x = 5;
+mut x = 5;
+
+loop {
+  x = x + 1;
+}
+
+let x = {
+  do_some_stuff();
+  3
+};

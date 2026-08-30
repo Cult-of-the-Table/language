@@ -1,5 +1,8 @@
 use logos::Logos;
 
+#[cfg(test)]
+mod test;
+
 #[derive(Logos, Clone, Debug, PartialEq)]
 #[logos(skip r"[ \t\r\n\f]+")]
 pub enum Token {

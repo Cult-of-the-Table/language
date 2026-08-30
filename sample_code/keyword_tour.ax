@@ -1,0 +1,27 @@
+fn keyword_tour(limit) {
+  let total = 0;
+  mut count = 0;
+
+  loop {
+    if (count >= limit) {
+      break;
+    }
+    count = count + 1;
+    continue;
+  }
+
+  while count < 10 {
+    count = count + 1;
+  }
+
+  for n in 0..3 {
+    total = total + n;
+  }
+
+  let ok = count != 0 and total == 0 or count == limit;
+  if (ok) {
+    return total;
+  } else {
+    return 0;
+  }
+}
