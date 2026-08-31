@@ -61,6 +61,8 @@ pub enum Token {
     Access,
     #[token(":", priority = 100)]
     Method,
+    #[token("::", priority = 200)]
+    DoubleColon,
 
     #[token("&", priority = 100)]
     Borrow,
