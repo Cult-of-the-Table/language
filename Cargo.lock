@@ -161,6 +161,7 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "lexer",
+ "logos",
 ]
 
 [[package]]

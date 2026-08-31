@@ -65,7 +65,7 @@ pub enum Token {
     DoubleColon,
 
     #[token("&", priority = 100)]
-    Borrow,
+    Ref,
 
     // Braces
     #[token("(", priority = 100)]
