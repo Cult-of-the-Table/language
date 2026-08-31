@@ -1,0 +1,15 @@
+let counter = {
+    value = 3,
+};
+
+counter::add = fn(&self)(n) {
+    self.value + n
+};
+
+let total = counter:add(3);
+
+let bound = counter:add;
+let unbound = counter::add;
+
+let via_bound = bound(3);
+let via_unbound = unbound(counter, 3);

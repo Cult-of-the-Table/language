@@ -15,12 +15,14 @@ impl Foo {
 
 let x: Foo = Foo { some_field: 3 };
 
-x.some_method <- unbound function (similar to Foo::some_method)
+// Unbound function access (similar to Foo::some_method in other languages)
+x.some_method
 
-x:some_method <- bound method (takes 2 ints)
+// Bound function access (`self` is now partially applied, passing `x:some_method` into a function allows it to access `self`)
+x:some_method
 
-
-x:copy 
+// Can also access properties, like so:
+x:copy()
 
 ```
 

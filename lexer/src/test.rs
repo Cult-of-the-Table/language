@@ -501,9 +501,8 @@ fn readme_full_snippet() {
     );
 }
 
-/// The struct/impl language reference block from the README, verbatim (its
-/// `<- ...`/`->` annotation lines included, showing how the ident regex
-/// absorbs `<`, `>` and `=`).
+/// The struct/impl language reference block from the README, verbatim.
+/// Its `//` annotation lines are emitted as `LineComment` tokens.
 #[test]
 fn readme_snippet_ax_language_reference() {
     assert_eq!(
@@ -570,36 +569,24 @@ fn readme_snippet_ax_language_reference() {
             int(3),
             Token::CloseBlock,
             Token::Semicolon,
+            Token::LineComment(
+                "Unbound function access (similar to Foo::some_method in other languages)".into(),
+            ),
             ident("x"),
             Token::Access,
             ident("some_method"),
-            ident("<"),
-            Token::Sub,
-            ident("unbound"),
-            ident("function"),
-            Token::OpenParen,
-            ident("similar"),
-            ident("to"),
-            ident("Foo"),
-            Token::Method,
-            Token::Method,
-            ident("some_method"),
-            Token::CloseParen,
+            Token::LineComment(
+                "Bound function access (`self` is now partially applied, passing `x:some_method` into a function allows it to access `self`)".into(),
+            ),
             ident("x"),
             Token::Method,
             ident("some_method"),
-            ident("<"),
-            Token::Sub,
-            ident("bound"),
-            ident("method"),
-            Token::OpenParen,
-            ident("takes"),
-            int(2),
-            ident("ints"),
-            Token::CloseParen,
+            Token::LineComment("Can also access properties, like so:".into()),
             ident("x"),
             Token::Method,
             ident("copy"),
+            Token::OpenParen,
+            Token::CloseParen,
         ]
     );
 }

@@ -1,0 +1,11 @@
+let point = {
+    x = 3,
+    y = 4,
+
+    :flip = fn(self) {
+        { x = self.y, y = self.x }
+    },
+};
+
+let flipped = point:flip();
+let swapped = flipped.x;

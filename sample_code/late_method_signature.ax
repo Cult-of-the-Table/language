@@ -1,0 +1,9 @@
+let my_obj = {
+    base = 1,
+};
+
+my_obj::foo = fn(&self)(a, b, c) {
+    self.base + a + b + c
+};
+
+let result = my_obj:foo(2, 3, 4);

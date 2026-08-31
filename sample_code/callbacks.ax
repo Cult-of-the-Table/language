@@ -1,0 +1,16 @@
+let button = {
+    label = "click",
+
+    on_click = fn() {
+        print("clicked")
+    },
+};
+
+let form = {
+    on_submit = fn(event) {
+        print(event)
+    },
+};
+
+(button.on_click)();
+(form.on_submit)("enter");
