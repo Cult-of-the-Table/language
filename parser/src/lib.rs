@@ -10,77 +10,70 @@ use chumsky::extra::Err;
 use lexer::Token;
 use ast::{BindKind, Conditional, Expression, KV, Node, Operator, Param, PlaceExpr, Statement};
 
-/// Consume zero or more comment tokens (`/* ... */` and `// ...`).
-///
-/// Comments may appear between any two significant tokens, so every token
-/// consumption in this parser goes through [`tok`] (or a `skip`-prefixed filter).
-fn skip_comments<'a, T>() -> impl Parser<'a, T, (), Err<Rich<'a, Token>>>
+/// Parse a full program, i.e. zero or more top-level items (statements or
+/// expressions). Comments are skipped between any two tokens, so comment-only
+/// files parse to an empty program.
+pub fn parser<'a, T>() -> impl Parser<'a, T, Vec<Node>, Err<Rich<'a, Token>>>
 where
     T: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-    any()
+    // ---- comment skipping ----
+    // Comments may appear between any two significant tokens, so every token
+    // consumption below goes through `tok` (or a skip-prefixed filter).
+    let skip_comments = any()
         .filter(|t| matches!(t, Token::InlineComment(_) | Token::LineComment(_)))
         .ignored()
-        .repeated()
-}
+        .repeated();
 
-/// Parse a single exact token, skipping any comments that precede it.
-fn tok<'a, T>(t: Token) -> impl Parser<'a, T, Token, Err<Rich<'a, Token>>>
-where
-    T: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
-    skip_comments()
-        .ignore_then(any().filter(move |x| *x == t))
-        .boxed()
-}
+    // Parse a single exact token, skipping any comments that precede it.
+    // `skip_comments` is `Copy`, so the closure takes its own copy.
+    let tok = move |t: Token| skip_comments.ignore_then(any().filter(move |x| *x == t)).boxed();
 
-/// The last component of a place expression after the identifier.
-enum PlaceSuffix {
-    Field(String),
-    Index(Node),
-}
-
-/// A suffix applied to an already-parsed expression.
-enum PostfixSuffix {
-    Access(String),
-    Method(String),
-    Call(Vec<Node>),
-    Index(Node),
-}
-
-/// `let`/`mut` bind a simple identifier; anything more complex becomes an assignment.
-fn bind_or_assign(target: PlaceExpr, value: Node, kind: BindKind) -> Node {
-    match target {
-        PlaceExpr::Identifier(name) => {
-            Node::stmt(Statement::Bind { name, kind, value: Box::new(value) })
-        }
-        target => Node::stmt(Statement::Assign { target, value: Box::new(value) }),
+    // ---- local helpers ----
+    // A step of a place expression after its identifier.
+    enum PlaceSuffix {
+        Field(String),
+        Index(Node),
     }
-}
 
-/// Build an `if`/`else if`/`else` chain; a bare `else` is an always-true arm.
-fn build_if(cond: Node, body: Node, els: Option<Node>) -> Node {
-    let mut arms = vec![Conditional {
-        cond: Box::new(cond),
-        eval: Box::new(body),
-    }];
-    if let Some(els) = els {
-        match els {
-            Node::Expression(Expression::If(mut nested)) => arms.append(&mut nested),
-            other => arms.push(Conditional {
-                cond: Box::new(Node::expr(Expression::Bool(true))),
-                eval: Box::new(other),
-            }),
+    // A suffix applied to an already-parsed expression.
+    enum PostfixSuffix {
+        Access(String),
+        Method(String),
+        Call(Vec<Node>),
+        Index(Node),
+    }
+
+    // `let`/`mut` bind a simple identifier; anything more complex becomes an
+    // assignment (`let a.b = 3` is just an assignment to a.b).
+    fn bind_or_assign(target: PlaceExpr, value: Node, kind: BindKind) -> Node {
+        match target {
+            PlaceExpr::Identifier(name) => {
+                Node::stmt(Statement::Bind { name, kind, value: Box::new(value) })
+            }
+            target => Node::stmt(Statement::Assign { target, value: Box::new(value) }),
         }
     }
-    Node::expr(Expression::If(arms))
-}
 
-/// Builds the full grammar and returns the top-level item list parser.
-fn items<'a, T>() -> impl Parser<'a, T, Vec<Node>, Err<Rich<'a, Token>>>
-where
-    T: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
+    // Build an `if`/`else if`/`else` chain; a bare `else` is an always-true arm.
+    fn build_if(cond: Node, body: Node, els: Option<Node>) -> Node {
+        let mut arms = vec![Conditional {
+            cond: Box::new(cond),
+            eval: Box::new(body),
+        }];
+        if let Some(els) = els {
+            match els {
+                Node::Expression(Expression::If(mut nested)) => arms.append(&mut nested),
+                other => arms.push(Conditional {
+                    cond: Box::new(Node::expr(Expression::Bool(true))),
+                    eval: Box::new(other),
+                }),
+            }
+        }
+        Node::expr(Expression::If(arms))
+    }
+
+    // ---- recursive handles ----
     let mut place = Recursive::declare();
     let mut expr = Recursive::declare();
     let mut block = Recursive::declare();
@@ -93,7 +86,7 @@ where
     let mut pow = Recursive::declare();
 
     // ---- primitives ----
-    let int = skip_comments()
+    let int = skip_comments
         .ignore_then(
             any().filter(|t| matches!(t, Token::Integer(_)))
                 .map(|t| match t {
@@ -103,7 +96,7 @@ where
         )
         .labelled("integer");
 
-    let bool = skip_comments()
+    let bool = skip_comments
         .ignore_then(
             any().filter(|t| matches!(t, Token::Bool(_)))
                 .map(|t| match t {
@@ -113,7 +106,7 @@ where
         )
         .labelled("boolean");
 
-    let string = skip_comments()
+    let string = skip_comments
         .ignore_then(
             any().filter(|t| matches!(t, Token::String(_)))
                 .map(|t| match t {
@@ -123,7 +116,7 @@ where
         )
         .labelled("string");
 
-    let ident = skip_comments()
+    let ident = skip_comments
         .ignore_then(
             any().filter(|t| matches!(t, Token::Ident(_)))
                 .map(|t| match t {
@@ -133,7 +126,7 @@ where
         )
         .labelled("identifier");
 
-    let ident_as_str = skip_comments()
+    let ident_as_str = skip_comments
         .ignore_then(
             any().filter(|t| matches!(t, Token::Ident(_)))
                 .map(|t| match t {
@@ -556,19 +549,9 @@ where
             .boxed(),
     );
 
-    skip_comments().ignore_then(item).repeated().collect::<Vec<_>>()
-}
-
-/// Parse a full program, i.e. zero or more top-level items (statements or
-/// expressions). Comments are skipped between tokens; comment-only files
-/// parse to an empty program.
-pub fn parser<'a, T>() -> impl Parser<'a, T, Vec<Node>, Err<Rich<'a, Token>>>
-where
-    T: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
-    // Skip comments before and after the item list so that comment-only
-    // files (and comments between items) parse cleanly.
-    skip_comments()
-        .ignore_then(items())
-        .then_ignore(skip_comments())
+    // Skip comments before, between and after items so that comment-only
+    // files (and comments separating two items) parse cleanly.
+    skip_comments
+        .ignore_then(skip_comments.ignore_then(item).repeated().collect::<Vec<_>>())
+        .then_ignore(skip_comments)
 }
