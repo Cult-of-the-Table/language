@@ -1,14 +1,4 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use chumsky::prelude::*;
+use lexer::Token;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub fn parser<'a, T>() -> impl Parser<'a, T, Expr, Err<Rich<'a, Token>>> + Clone

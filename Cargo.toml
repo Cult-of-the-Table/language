@@ -4,5 +4,9 @@ members = [
   "parser",
   "cli"
 ]
-
 resolver = "3"
+[workspace.dependencies]
+lexer = { path = "lexer"}
+parser = { path = "parser"}
+cli = { path = "cli"}
+
