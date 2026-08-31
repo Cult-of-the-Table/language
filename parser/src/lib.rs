@@ -1,18 +1,14 @@
 pub mod ast;
 
-use ast::{Expr, Node, PlaceExpr, Statement};
-use chumsky::extra::{Err, Full};
+use ast::{
+    BindKind, Conditional, Expr as Expression, KV, Node, Operator, Param, PlaceExpr, Statement,
+};
+use chumsky::extra::Err;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
-use chumsky::recursive::Indirect;
 use chumsky::span::SimpleSpan;
 use lexer::Token;
-use ast::{BindKind, Conditional, Expression, KV, Node, Operator, Param, PlaceExpr, Statement};
 
-/// Consume zero or more comment tokens (`/* ... */` and `// ...`).
-///
-/// Comments may appear between any two significant tokens, so every token
-/// consumption in this parser goes through [`tok`] (or a `skip`-prefixed filter).
 fn skip_comments<'a, T>() -> impl Parser<'a, T, (), Err<Rich<'a, Token>>>
 where
     T: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -23,7 +19,6 @@ where
         .repeated()
 }
 
-/// Parse a single exact token, skipping any comments that precede it.
 fn tok<'a, T>(t: Token) -> impl Parser<'a, T, Token, Err<Rich<'a, Token>>>
 where
     T: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -50,10 +45,15 @@ enum PostfixSuffix {
 /// `let`/`mut` bind a simple identifier; anything more complex becomes an assignment.
 fn bind_or_assign(target: PlaceExpr, value: Node, kind: BindKind) -> Node {
     match target {
-        PlaceExpr::Identifier(name) => {
-            Node::stmt(Statement::Bind { name, kind, value: Box::new(value) })
-        }
-        target => Node::stmt(Statement::Assign { target, value: Box::new(value) }),
+        PlaceExpr::Identifier(name) => Node::stmt(Statement::Bind {
+            name,
+            kind,
+            value: Box::new(value),
+        }),
+        target => Node::stmt(Statement::Assign {
+            target,
+            value: Box::new(value),
+        }),
     }
 }
 
@@ -65,7 +65,7 @@ fn build_if(cond: Node, body: Node, els: Option<Node>) -> Node {
     }];
     if let Some(els) = els {
         match els {
-            Node::Expression(Expression::If(mut nested)) => arms.append(&mut nested),
+            Node::Expr(Expression::If(mut nested)) => arms.append(&mut nested),
             other => arms.push(Conditional {
                 cond: Box::new(Node::expr(Expression::Bool(true))),
                 eval: Box::new(other),
@@ -92,29 +92,17 @@ where
     let mut pow = Recursive::declare();
 
     // ---- primitives ----
-    let int = skip_comments()
-        .ignore_then(
-            any().filter(|t| matches!(t, Token::Integer(_)))
-                .map(|t| match t {
-                    Token::Integer(x) => Node::expr(Expression::Integer(x)),
-                    _ => unreachable!(),
-                }),
-        )
-        .labelled("integer");
-
-    let bool = skip_comments()
-        .ignore_then(
-            any().filter(|t| matches!(t, Token::Bool(_)))
-                .map(|t| match t {
-                    Token::Bool(x) => Node::expr(Expression::Bool(x)),
-                    _ => unreachable!(),
-                }),
-        )
-        .labelled("boolean");
+    let int = skip_comments().ignore_then(any().filter(|t| matches!(t, Token::Integer(_))).map(
+        |t| match t {
+            Token::Integer(x) => Node::expr(Expression::Integer(x)),
+            _ => unreachable!(),
+        },
+    ));
 
     let string = skip_comments()
         .ignore_then(
-            any().filter(|t| matches!(t, Token::String(_)))
+            any()
+                .filter(|t| matches!(t, Token::String(_)))
                 .map(|t| match t {
                     Token::String(x) => Node::expr(Expression::String(x)),
                     _ => unreachable!(),
@@ -122,9 +110,21 @@ where
         )
         .labelled("string");
 
+    let bool = skip_comments()
+        .ignore_then(
+            any()
+                .filter(|t| matches!(t, Token::Bool(_)))
+                .map(|t| match t {
+                    Token::Bool(x) => Node::expr(Expression::Bool(x)),
+                    _ => unreachable!(),
+                }),
+        )
+        .labelled("boolean");
+
     let ident = skip_comments()
         .ignore_then(
-            any().filter(|t| matches!(t, Token::Ident(_)))
+            any()
+                .filter(|t| matches!(t, Token::Ident(_)))
                 .map(|t| match t {
                     Token::Ident(x) => Node::place(PlaceExpr::Identifier(x)),
                     _ => unreachable!(),
@@ -134,7 +134,8 @@ where
 
     let ident_as_str = skip_comments()
         .ignore_then(
-            any().filter(|t| matches!(t, Token::Ident(_)))
+            any()
+                .filter(|t| matches!(t, Token::Ident(_)))
                 .map(|t| match t {
                     Token::Ident(x) => x,
                     _ => unreachable!(),
@@ -146,8 +147,12 @@ where
     // ---- place expressions (assignment targets) ----
     // `a`, `a.b.c`, `obj::method`, `a[3]`
     let place_suffix = choice((
-        tok(Token::Access).ignore_then(ident_as_str.clone()).map(PlaceSuffix::Field),
-        tok(Token::DoubleColon).ignore_then(ident_as_str.clone()).map(PlaceSuffix::Field),
+        tok(Token::Access)
+            .ignore_then(ident_as_str.clone())
+            .map(PlaceSuffix::Field),
+        tok(Token::DoubleColon)
+            .ignore_then(ident_as_str.clone())
+            .map(PlaceSuffix::Field),
         tok(Token::OpenList)
             .ignore_then(expr.clone())
             .then_ignore(tok(Token::CloseList))
@@ -181,7 +186,11 @@ where
     let kv = key
         .then_ignore(tok(Token::Assign))
         .then(expr.clone())
-        .map(|((key, method), value)| KV { key, method, value: Box::new(value) })
+        .map(|((key, method), value)| KV {
+            key,
+            method,
+            value: Box::new(value),
+        })
         .labelled("kv pair");
 
     let kvset = kv
@@ -232,7 +241,12 @@ where
         .then_ignore(tok(Token::Assign))
         .then(expr.clone())
         .then_ignore(tok(Token::Semicolon).or_not())
-        .map(|(target, value)| Node::stmt(Statement::Assign { target, value: Box::new(value) }));
+        .map(|(target, value)| {
+            Node::stmt(Statement::Assign {
+                target,
+                value: Box::new(value),
+            })
+        });
 
     let r#continue = tok(Token::Continue)
         .ignore_then(tok(Token::Semicolon).or_not())
@@ -399,10 +413,16 @@ where
         .then_ignore(tok(Token::CloseParen));
 
     let postfix_suffix = choice((
-        tok(Token::Access).ignore_then(ident_as_str.clone()).map(PostfixSuffix::Access),
+        tok(Token::Access)
+            .ignore_then(ident_as_str.clone())
+            .map(PostfixSuffix::Access),
         // Both `x:method` (bound) and `x::method` (late-defined slot) surface as methods.
-        tok(Token::Method).ignore_then(ident_as_str.clone()).map(PostfixSuffix::Method),
-        tok(Token::DoubleColon).ignore_then(ident_as_str.clone()).map(PostfixSuffix::Method),
+        tok(Token::Method)
+            .ignore_then(ident_as_str.clone())
+            .map(PostfixSuffix::Method),
+        tok(Token::DoubleColon)
+            .ignore_then(ident_as_str.clone())
+            .map(PostfixSuffix::Method),
         call_args.map(PostfixSuffix::Call),
         tok(Token::OpenList)
             .ignore_then(expr.clone())
@@ -438,10 +458,15 @@ where
             .boxed(),
     );
 
-    unary.define(choice((
-        tok(Token::Sub).ignore_then(unary.clone()).map(|v| Node::unop(Operator::Minus, v)),
-        pow.clone(),
-    )).boxed());
+    unary.define(
+        choice((
+            tok(Token::Sub)
+                .ignore_then(unary.clone())
+                .map(|v| Node::unop(Operator::Minus, v)),
+            pow.clone(),
+        ))
+        .boxed(),
+    );
 
     let mul = unary
         .clone()
@@ -518,13 +543,7 @@ where
 
     // ---- blocks & statements ----
     let statement = choice((
-        r#let,
-        r#mut,
-        r#assign,
-        r#fn_named,
-        r#break,
-        r#continue,
-        r#return,
+        r#let, r#mut, r#assign, r#fn_named, r#break, r#continue, r#return,
     ));
 
     // Semicolon-terminated items (block content), plus control flow which
@@ -555,7 +574,10 @@ where
             .boxed(),
     );
 
-    skip_comments().ignore_then(item).repeated().collect::<Vec<_>>()
+    skip_comments()
+        .ignore_then(item)
+        .repeated()
+        .collect::<Vec<_>>()
 }
 
 /// Parse a full program, i.e. zero or more top-level items (statements or

@@ -126,14 +126,6 @@ impl Node {
         Node::Statement(s)
     }
 
-    pub fn integer(i: i64) -> Node {
-        Node::expr(Expr::Integer(i))
-    }
-
-    pub fn boolean(b: bool) -> Node {
-        Node::expr(Expr::Bool(b))
-    }
-
     pub fn identifier(name: impl Into<String>) -> Node {
         Node::place(PlaceExpr::Identifier(name.into()))
     }
