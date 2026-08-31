@@ -3,12 +3,12 @@ pub mod ast;
 #[cfg(test)]
 mod test;
 
+use ast::{BindKind, Conditional, Expr, KV, Node, Operator, Param, PlaceExpr, Statement};
+use chumsky::extra::Err;
+use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
-use chumsky::input::ValueInput;
-use chumsky::extra::Err;
 use lexer::Token;
-use ast::{BindKind, Conditional, Expr, KV, Node, Operator, Param, PlaceExpr, Statement};
 
 /// Parse a full program, i.e. zero or more top-level items (statements or
 /// expressions). Comments are skipped between any two tokens, so comment-only
@@ -27,7 +27,11 @@ where
 
     // Parse a single exact token, skipping any comments that precede it.
     // `skip_comments` is `Copy`, so the closure takes its own copy.
-    let tok = move |t: Token| skip_comments.ignore_then(any().filter(move |x| *x == t)).boxed();
+    let tok = move |t: Token| {
+        skip_comments
+            .ignore_then(any().filter(move |x| *x == t))
+            .boxed()
+    };
 
     // ---- local helpers ----
     // A step of a place expression after its identifier.
@@ -48,10 +52,15 @@ where
     // assignment (`let a.b = 3` is just an assignment to a.b).
     fn bind_or_assign(target: PlaceExpr, value: Node, kind: BindKind) -> Node {
         match target {
-            PlaceExpr::Identifier(name) => {
-                Node::stmt(Statement::Bind { name, kind, value: Box::new(value) })
-            }
-            target => Node::stmt(Statement::Assign { target, value: Box::new(value) }),
+            PlaceExpr::Identifier(name) => Node::stmt(Statement::Bind {
+                name,
+                kind,
+                value: Box::new(value),
+            }),
+            target => Node::stmt(Statement::Assign {
+                target,
+                value: Box::new(value),
+            }),
         }
     }
 
@@ -88,7 +97,8 @@ where
     // ---- primitives ----
     let int = skip_comments
         .ignore_then(
-            any().filter(|t| matches!(t, Token::Integer(_)))
+            any()
+                .filter(|t| matches!(t, Token::Integer(_)))
                 .map(|t| match t {
                     Token::Integer(x) => Node::expr(Expr::Integer(x)),
                     _ => unreachable!(),
@@ -98,7 +108,8 @@ where
 
     let bool = skip_comments
         .ignore_then(
-            any().filter(|t| matches!(t, Token::Bool(_)))
+            any()
+                .filter(|t| matches!(t, Token::Bool(_)))
                 .map(|t| match t {
                     Token::Bool(x) => Node::expr(Expr::Bool(x)),
                     _ => unreachable!(),
@@ -108,7 +119,8 @@ where
 
     let string = skip_comments
         .ignore_then(
-            any().filter(|t| matches!(t, Token::String(_)))
+            any()
+                .filter(|t| matches!(t, Token::String(_)))
                 .map(|t| match t {
                     Token::String(x) => Node::expr(Expr::String(x)),
                     _ => unreachable!(),
@@ -118,7 +130,8 @@ where
 
     let ident = skip_comments
         .ignore_then(
-            any().filter(|t| matches!(t, Token::Ident(_)))
+            any()
+                .filter(|t| matches!(t, Token::Ident(_)))
                 .map(|t| match t {
                     Token::Ident(x) => Node::place(PlaceExpr::Identifier(x)),
                     _ => unreachable!(),
@@ -128,7 +141,8 @@ where
 
     let ident_as_str = skip_comments
         .ignore_then(
-            any().filter(|t| matches!(t, Token::Ident(_)))
+            any()
+                .filter(|t| matches!(t, Token::Ident(_)))
                 .map(|t| match t {
                     Token::Ident(x) => x,
                     _ => unreachable!(),
@@ -140,8 +154,12 @@ where
     // ---- place expressions (assignment targets) ----
     // `a`, `a.b.c`, `obj::method`, `a[3]`
     let place_suffix = choice((
-        tok(Token::Access).ignore_then(ident_as_str.clone()).map(PlaceSuffix::Field),
-        tok(Token::DoubleColon).ignore_then(ident_as_str.clone()).map(PlaceSuffix::Field),
+        tok(Token::Access)
+            .ignore_then(ident_as_str.clone())
+            .map(PlaceSuffix::Field),
+        tok(Token::DoubleColon)
+            .ignore_then(ident_as_str.clone())
+            .map(PlaceSuffix::Field),
         tok(Token::OpenList)
             .ignore_then(expr.clone())
             .then_ignore(tok(Token::CloseList))
@@ -175,7 +193,11 @@ where
     let kv = key
         .then_ignore(tok(Token::Assign))
         .then(expr.clone())
-        .map(|((key, method), value)| KV { key, method, value: Box::new(value) })
+        .map(|((key, method), value)| KV {
+            key,
+            method,
+            value: Box::new(value),
+        })
         .labelled("kv pair");
 
     let kvset = kv
@@ -226,7 +248,12 @@ where
         .then_ignore(tok(Token::Assign))
         .then(expr.clone())
         .then_ignore(tok(Token::Semicolon).or_not())
-        .map(|(target, value)| Node::stmt(Statement::Assign { target, value: Box::new(value) }));
+        .map(|(target, value)| {
+            Node::stmt(Statement::Assign {
+                target,
+                value: Box::new(value),
+            })
+        });
 
     let r#continue = tok(Token::Continue)
         .ignore_then(tok(Token::Semicolon).or_not())
@@ -393,10 +420,16 @@ where
         .then_ignore(tok(Token::CloseParen));
 
     let postfix_suffix = choice((
-        tok(Token::Access).ignore_then(ident_as_str.clone()).map(PostfixSuffix::Access),
+        tok(Token::Access)
+            .ignore_then(ident_as_str.clone())
+            .map(PostfixSuffix::Access),
         // Both `x:method` (bound) and `x::method` (late-defined slot) surface as methods.
-        tok(Token::Method).ignore_then(ident_as_str.clone()).map(PostfixSuffix::Method),
-        tok(Token::DoubleColon).ignore_then(ident_as_str.clone()).map(PostfixSuffix::Method),
+        tok(Token::Method)
+            .ignore_then(ident_as_str.clone())
+            .map(PostfixSuffix::Method),
+        tok(Token::DoubleColon)
+            .ignore_then(ident_as_str.clone())
+            .map(PostfixSuffix::Method),
         call_args.map(PostfixSuffix::Call),
         tok(Token::OpenList)
             .ignore_then(expr.clone())
@@ -432,10 +465,15 @@ where
             .boxed(),
     );
 
-    unary.define(choice((
-        tok(Token::Sub).ignore_then(unary.clone()).map(|v| Node::unop(Operator::Minus, v)),
-        pow.clone(),
-    )).boxed());
+    unary.define(
+        choice((
+            tok(Token::Sub)
+                .ignore_then(unary.clone())
+                .map(|v| Node::unop(Operator::Minus, v)),
+            pow.clone(),
+        ))
+        .boxed(),
+    );
 
     let mul = unary
         .clone()
@@ -512,13 +550,7 @@ where
 
     // ---- blocks & statements ----
     let statement = choice((
-        r#let,
-        r#mut,
-        r#assign,
-        r#fn_named,
-        r#break,
-        r#continue,
-        r#return,
+        r#let, r#mut, r#assign, r#fn_named, r#break, r#continue, r#return,
     ));
 
     // Semicolon-terminated items (block content), plus control flow which
@@ -552,6 +584,12 @@ where
     // Skip comments before, between and after items so that comment-only
     // files (and comments separating two items) parse cleanly.
     skip_comments
-        .ignore_then(skip_comments.ignore_then(item).repeated().collect::<Vec<_>>())
+        .ignore_then(
+            skip_comments
+                .ignore_then(item)
+                .repeated()
+                .collect::<Vec<_>>(),
+        )
         .then_ignore(skip_comments)
 }
+
