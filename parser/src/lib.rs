@@ -5,7 +5,7 @@ use chumsky::span::SimpleSpan;
 use chumsky::input::ValueInput;
 use chumsky::extra::Err;
 use lexer::Token;
-use ast::Expr;
+use ast::{Node, Expr, Param, Statement, BindKind};
 
 pub fn parser<'a, T>() -> impl Parser<'a, T, Expr, Err<Rich<'a, Token>>>
 where
@@ -99,7 +99,82 @@ where
                 .or_not())
         .map(|e| Expr::Return(e))
         .boxed();
-    
+
+    let r#ref = just(Token::Ref)
+        .labelled("ref")
+        .ignore_then(ident.clone())
+        .then(
+            just(Token::Assign)
+            .ignore_then(expr.clone())
+            .labelled("ref assign")
+            .or_not())
+        .map(|(r, n)| Param {
+            name: r.clone(),
+            default: n,
+            kind: BindKind::Borrow
+        });
+
+    let r#mut_ref = just(Token::Ref)
+        .labelled("mut ref")
+        .ignore_then(just(Token::Mut))
+        .ignore_then(ident.clone())
+        .then(
+            just(Token::Assign)
+            .ignore_then(expr.clone())
+            .labelled("mut ref assign")
+            .or_not())
+        .map(|(r, n)| Param {
+            name: r.clone(),
+            default: n,
+            kind: BindKind::BorrowMut
+        });
+
+    let r#move_ref = ident
+        .clone()
+        .labelled("move ref")
+        .then(
+            just(Token::Assign)
+            .ignore_then(expr.clone())
+            .labelled("move assign")
+            .or_not())
+        .map(|(r, n)| Param {
+            name: r.clone(),
+            default: n,
+            kind: BindKind::Move
+        });
+
+    let r#fn_args = choice((
+            r#ref,
+            r#mut_ref,
+            r#move_ref
+        ))
+        .separated_by(just(Token::ItemSep))
+        .labelled("fn arguments")
+        .delimited_by(Token::OpenParen, Token::CloseParen)
+        .boxed();
+
+    let r#fn_named = just(Token::Function)
+        .ignore_then(ident_as_str.clone())
+        .then(
+            r#fn_args
+            .repeated()
+            .at_least(1)
+            .labelled("fn formal parameters")
+        )
+        .then(block.clone())
+        .map(Statement::Fn);
+
+    let r#fn_anon = just(Token::Function)
+        .ignore_then(
+            r#fn_args
+            .clone()
+            .repeated()
+            .at_least(1)
+            .labelled("fn anonymous parameters")
+        )
+        .then(block.clone()) 
+        .map(Expr::Fn);
+
 
     todo!()
 }
