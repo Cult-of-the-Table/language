@@ -1,15 +1,17 @@
 pub mod ast;
 
+use ast::{Expr, Node, PlaceExpr, Statement};
+use chumsky::extra::Err;
+use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
-use chumsky::input::ValueInput;
-use chumsky::extra::Err;
 use lexer::Token;
-use ast::Expr;
 
-pub fn parser<'a, T>() -> impl Parser<'a, T, Expr, Err<Rich<'a, Token>>>
+use crate::ast::BindKind;
+
+pub fn parser<'a, T>() -> impl Parser<'a, T, Node, Err<Rich<'a, Token>>>
 where
-    T: ValueInput<'a, Token=Token, Span=SimpleSpan>
+    T: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
     let mut expr = Recursive::declare();
     let mut place = Recursive::declare();
@@ -19,44 +21,32 @@ where
 
     let int = any()
         .filter(|t| matches!(t, Token::Integer(_)))
-        .map (|t| match t {
+        .map(|t| match t {
             Token::Integer(x) => Expr::Integer(x),
-            _ => unreachable!()
+            _ => unreachable!(),
         })
         .labelled("integer")
         .boxed();
 
     let ident = any()
         .filter(|t| matches!(t, Token::Ident(_)))
-        .map (|t| match t {
-            Token::Ident(x) => Expr::Ident(x),
-            _ => unreachable!()
+        .map(|t| match t {
+            Token::Ident(x) => PlaceExpr::Identifier(x),
+            _ => unreachable!(),
         })
         .labelled("identifier")
         .boxed();
 
     let ident_as_str = any()
         .filter(|t| matches!(t, Token::Ident(_)))
-        .map (|t| match t {
+        .map(|t| match t {
             Token::Ident(x) => x,
-            _ => unreachable!()
+            _ => unreachable!(),
         })
         .labelled("identifier as string")
         .boxed();
 
     let place = ident_as_str.clone(); // TODO: Implement place expression parser
-
-    let kvset = place
-        .clone()
-        .then_ignore(just(Token::Assign))
-        .then(expr.clone())
-        .map(ast::KV)
-        .labelled("kv pair")
-        .separated_by(just(Token::ItemSep).labelled("comma sep"))
-        .allow_trailing()
-        .collect::<Vec<_>>()
-        .labelled("dict fields")
-        .boxed();
 
     let r#let = just(Token::Let)
         .labelled("let")
@@ -64,7 +54,7 @@ where
         .then_ignore(just(Token::Assign))
         .then(expr.clone())
         .then_ignore(just(Token::Semicolon))
-        .map(|(place, val)| Expr::Assign(place, val));
+        .map(|(name, val)| Node::bind(name, BindKind::Move, val));
 
     let r#mut = just(Token::Mut)
         .labelled("mut")
@@ -72,12 +62,12 @@ where
         .then_ignore(just(Token::Assign))
         .then(expr.clone())
         .then_ignore(just(Token::Semicolon))
-        .map(|(place, val)| Expr::Assign(place, val));
+        .map(|(name, val)| Node::bind(name, BindKind::BorrowMut, val));
 
     let r#continue = just(Token::Continue)
         .labelled("continue")
         .ignore_then(just(Token::Semicolon))
-        .map(Expr::Continue)
+        .map(|_| Node::stmt(Statement::Continue))
         .boxed();
 
     let r#break = just(Token::Break)
@@ -86,8 +76,9 @@ where
             expr.clone()
                 .map(|i| Box::new(i))
                 .labelled("break body")
-                .or_not())
-        .map(|e| Expr::Break(e))
+                .or_not(),
+        )
+        .map(|e| Statement::Break(e))
         .boxed();
 
     let r#return = just(Token::Return)
@@ -96,10 +87,8 @@ where
             expr.clone()
                 .map(|i| Box::new(i))
                 .labelled("return body")
-                .or_not())
-        .map(|e| Expr::Return(e))
+                .or_not(),
+        )
+        .map(|e| Statement::Return(e))
         .boxed();
-    
-
-    todo!()
 }

@@ -15,7 +15,7 @@ pub enum Operator {
 
 #[derive(Clone, Debug)]
 pub enum Node {
-    Expression(Expression),
+    Expr(Expr),
     PlaceExpr(PlaceExpr),
     Statement(Statement),
 }
@@ -57,7 +57,7 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug)]
-pub enum Expression {
+pub enum Expr {
     Integer(i64),
     Bool(bool),
     String(String),
@@ -91,8 +91,8 @@ pub enum PlaceExpr {
 }
 
 impl Node {
-    pub fn expr(e: Expression) -> Node {
-        Node::Expression(e)
+    pub fn expr(e: Expr) -> Node {
+        Node::Expr(e)
     }
 
     pub fn place(p: PlaceExpr) -> Node {
@@ -103,8 +103,20 @@ impl Node {
         Node::Statement(s)
     }
 
+    pub fn integer(i: i64) -> Node {
+        Node::expr(Expr::Integer(i))
+    }
+
+    pub fn boolean(b: bool) -> Node {
+        Node::expr(Expr::Bool(b))
+    }
+
+    pub fn identifier(name: impl Into<String>) -> Node {
+        Node::place(PlaceExpr::Identifier(name.into()))
+    }
+
     pub fn binop(op: Operator, l: Node, r: Node) -> Node {
-        Node::expr(Expression::Operator {
+        Node::expr(Expr::Operator {
             op,
             left: Box::new(l),
             right: Box::new(r),
@@ -112,18 +124,18 @@ impl Node {
     }
 
     pub fn unop(op: Operator, v: Node) -> Node {
-        Node::expr(Expression::UnaryOperator {
+        Node::expr(Expr::UnaryOperator {
             op,
             value: Box::new(v),
         })
     }
 
     pub fn call(callee: Node, args: Vec<Node>) -> Node {
-        Node::expr(Expression::Call(Box::new(callee), args))
+        Node::expr(Expr::Call(Box::new(callee), args))
     }
 
     pub fn cond(cond: Node, eval: Node) -> Node {
-        Node::expr(Expression::Conditional(Conditional {
+        Node::expr(Expr::Conditional(Conditional {
             cond: Box::new(cond),
             eval: Box::new(eval),
         }))
@@ -144,4 +156,3 @@ impl Node {
         })
     }
 }
-
