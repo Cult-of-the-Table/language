@@ -1,0 +1,11 @@
+let counter = {
+    value = 3,
+
+    :value = fn(&self) { self.value },
+};
+
+let field = counter.value;
+let method = counter:value();
+
+let bound = counter:value;
+let called = bound();

@@ -1,0 +1,9 @@
+let x = {
+    value = 3,
+
+    :size = fn(&self) self.value,
+
+    :add = fn(&self)(n) {
+        self.value + n
+    },
+};

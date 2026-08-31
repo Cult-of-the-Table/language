@@ -1,0 +1,18 @@
+let rectangle = {
+    width = 3,
+    height = 4,
+
+    :area = fn(&self) self.width * self.height,
+
+    :scale = fn(&self)(factor) {
+        self.width * factor * self.height
+    },
+
+    :both = fn(&self) {
+        let a = self:area();
+        let s = self:scale(2);
+        a + s
+    },
+};
+
+let total = rectangle:both();

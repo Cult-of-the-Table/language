@@ -1,0 +1,13 @@
+let point = {
+    x = 3,
+    y = 4,
+
+    distance = fn(self) {
+        self.x * self.x + self.y * self.y
+    },
+
+    double = fn(n) n * 2,
+};
+
+let dist = (point.distance)(point);
+let twice = (point.double)(point.x);
