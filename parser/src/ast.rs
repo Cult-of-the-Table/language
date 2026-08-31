@@ -9,6 +9,10 @@ pub enum Operator {
     Cat,
     Eq,
     Neq,
+    Gt,
+    Lt,
+    Ge,
+    Le,
     And,
     Or,
 }
@@ -35,6 +39,14 @@ pub struct Param {
 }
 
 #[derive(Clone, Debug)]
+pub struct KV {
+    pub key: String,
+    /// Whether the field is a method slot (`:name = fn(...)`).
+    pub method: bool,
+    pub value: Box<Node>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Conditional {
     pub cond: Box<Node>,
     pub eval: Box<Node>,
@@ -45,6 +57,7 @@ pub enum Statement {
     Continue,
     Break(Option<Box<Node>>),
     Return(Option<Box<Node>>),
+    Fn(String, Vec<Param>, Box<Node>),
     Bind {
         name: String,
         kind: BindKind,
@@ -63,10 +76,20 @@ pub enum Expression {
     String(String),
     Err(String),
 
-    Block(Vec<Node>, Box<Node>),
+    Block(Vec<Node>, Option<Box<Node>>),
+    Dict(Vec<KV>),
+    List(Vec<Node>),
     Conditional(Conditional),
     If(Vec<Conditional>),
     Loop(Box<Node>),
+    While(Box<Node>, Box<Node>),
+    For {
+        var: String,
+        from: Box<Node>,
+        to: Box<Node>,
+        inclusive: bool,
+        body: Box<Node>,
+    },
 
     Operator {
         op: Operator,

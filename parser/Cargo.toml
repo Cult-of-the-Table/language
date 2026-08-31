@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 lexer = {workspace = true}
 chumsky = "0.13.0"
+
+[dev-dependencies]
+logos = "0.16.1"
