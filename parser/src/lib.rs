@@ -64,23 +64,6 @@ where
         }
     }
 
-    // Build an `if`/`else if`/`else` chain; a bare `else` is an always-true arm.
-    fn build_if(cond: Node, body: Node, els: Option<Node>) -> Node {
-        let mut arms = vec![Conditional {
-            cond: Box::new(cond),
-            eval: Box::new(body),
-        }];
-        if let Some(els) = els {
-            match els {
-                Node::Expr(Expr::If(mut nested)) => arms.append(&mut nested),
-                other => arms.push(Conditional {
-                    cond: Box::new(Node::expr(Expr::Bool(true))),
-                    eval: Box::new(other),
-                }),
-            }
-        }
-        Node::expr(Expr::If(arms))
-    }
 
     // ---- recursive handles ----
     let mut place = Recursive::declare();
@@ -88,9 +71,6 @@ where
     let mut block = Recursive::declare();
     let mut dict = Recursive::declare();
     let mut list = Recursive::declare();
-    let mut r#if: chumsky::recursive::Recursive<
-        chumsky::recursive::Indirect<'a, 'a, T, Node, Err<Rich<'a, Token>>>,
-    > = Recursive::declare();
     let mut unary = Recursive::declare();
     let mut pow = Recursive::declare();
 
@@ -380,19 +360,49 @@ where
         .boxed();
 
     // `if (cond) { ... } else if (cond) { ... } else { ... }`
-    let paren_cond = tok(Token::OpenParen)
-        .ignore_then(expr.clone())
-        .then_ignore(tok(Token::CloseParen));
-
-    let r#else = tok(Token::Else).ignore_then(choice((r#if.clone(), block.clone())));
-
-    r#if.define(
-        tok(Token::If)
-            .ignore_then(paren_cond.then(block.clone()))
-            .then(r#else.or_not())
-            .map(|((cond, body), els)| build_if(cond, body, els))
-            .boxed(),
-    );
+    //
+    // An if-arm is `if (cond) { body }`. Arms chain through `else`, and the
+    // chain ends with an optional bare `else { body }`, which is treated as an
+    // arm whose condition is always true.
+    let ifelse = tok(Token::If)
+        .ignore_then(
+            expr.clone()
+                .labelled("if condition")
+                .delimited_by(tok(Token::OpenParen), tok(Token::CloseParen)),
+        )
+        .then(block.clone().labelled("if body"))
+        .map(|(cond, body)| Conditional {
+            cond: Box::new(cond),
+            eval: Box::new(body),
+        })
+        .labelled("if arm")
+        .separated_by(tok(Token::Else))
+        .at_least(1)
+        .collect::<Vec<_>>()
+        .then(
+            tok(Token::Else)
+                .ignore_then(
+                    block
+                        .clone()
+                        .labelled("else body")
+                        .or_not()
+                        .map(|body| Conditional {
+                            // A bare `else` is a condition that is always true.
+                            cond: Box::new(Node::expr(Expr::Bool(true))),
+                            eval: Box::new(body.unwrap_or_else(|| {
+                                Node::expr(Expr::Block(Vec::new(), None))
+                            })),
+                        }),
+                )
+                .or_not(),
+        )
+        .map(|(mut arms, els)| {
+            if let Some(els) = els {
+                arms.push(els);
+            }
+            Node::expr(Expr::If(arms))
+        })
+        .boxed();
 
     // ---- atoms ----
     let atom = choice((
@@ -557,7 +567,7 @@ where
     // terminates on its own closing brace.
     let item_semi = choice((
         statement,
-        r#if.clone(),
+        ifelse.clone(),
         r#loop.clone(),
         r#while.clone(),
         r#for.clone(),
