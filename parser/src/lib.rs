@@ -48,6 +48,7 @@ where
         Index(Node),
     }
 
+
     // `let`/`mut` bind a simple identifier; anything more complex becomes an
     // assignment (`let a.b = 3` is just an assignment to a.b).
     fn bind_or_assign(target: PlaceExpr, value: Node, kind: BindKind) -> Node {
